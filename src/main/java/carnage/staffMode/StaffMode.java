@@ -1,9 +1,7 @@
 package carnage.staffMode;
 
 import carnage.staffMode.commands.StaffModeCommand;
-import carnage.staffMode.listeners.CombatListener;
-import carnage.staffMode.listeners.StaffModeListener;
-import carnage.staffMode.listeners.VanishListener;
+import carnage.staffMode.listeners.*;
 import org.bukkit.GameMode;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -25,6 +23,8 @@ public final class StaffMode extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new StaffModeListener(this), this);
         getServer().getPluginManager().registerEvents(new VanishListener(this), this);
         getServer().getPluginManager().registerEvents(new CombatListener(this), this);
+        getServer().getPluginManager().registerEvents(new RandomPlayerTpaListener(), this);
+        getServer().getPluginManager().registerEvents(new FreezeListener(this), this);
     }
 
     public Set<UUID> getStaffModePlayers() { return staffModePlayers; }

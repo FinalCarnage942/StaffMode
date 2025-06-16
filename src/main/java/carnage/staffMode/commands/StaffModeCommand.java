@@ -77,8 +77,13 @@ public class StaffModeCommand implements CommandExecutor {
             ItemStack freeze = makeTool(Material.IRON_SHOVEL, "Freeze Tool",
                     "Right click a player to freeze", "Right click again to unfreeze");
 
+            // Random teleport tool
+            ItemStack randomTeleport = makeTool(Material.NETHER_STAR, "Random Teleport",
+                    "Right click to teleport", "to a random player");
+
             player.getInventory().setItem(0, vanish);
             player.getInventory().setItem(1, freeze);
+            player.getInventory().setItem(2, randomTeleport);
 
             // Vanish on start
             vanished.add(uuid);
