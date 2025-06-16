@@ -1,0 +1,17 @@
+name: StaffMode
+version: '1.0-SNAPSHOT'
+main: carnage.staffMode.StaffMode
+api-version: '1.21'
+depend: [TAB]
+softdepend: [DeluxeCombat]
+
+permissions:
+  staffmode.use:
+    description: Allows the player to toggle staff mode.
+    default: op
+
+commands:
+  staffmode:
+    aliases: [sm]
+    description: Toggles staff mode
+    usage: /staffmode
