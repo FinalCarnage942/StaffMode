@@ -17,11 +17,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 public class FreezeListener implements Listener {
 
@@ -33,18 +29,29 @@ public class FreezeListener implements Listener {
         this.plugin = plugin;
     }
 
+    public boolean isFrozen(UUID uuid) {
+        return frozen.contains(uuid);
+    }
+
+    public Set<UUID> getFrozenPlayers() {
+        return Collections.unmodifiableSet(frozen);
+    }
+
     @EventHandler
     public void onInteractEntity(PlayerInteractEntityEvent e) {
         Player staff = e.getPlayer();
         if (!plugin.getStaffModePlayers().contains(staff.getUniqueId())) return;
-
         if (!(e.getRightClicked() instanceof Player target)) return;
 
         ItemStack item = staff.getInventory().getItemInMainHand();
         if (item == null || item.getType() != Material.IRON_SHOVEL) return;
 
         e.setCancelled(true);
-        freeze(target, staff);
+        if (frozen.contains(target.getUniqueId())) {
+            unfreeze(target);
+        } else {
+            freeze(target, staff);
+        }
     }
 
     @EventHandler
@@ -57,29 +64,53 @@ public class FreezeListener implements Listener {
         if (item == null || item.getType() != Material.IRON_SHOVEL) return;
 
         e.setCancelled(true);
-        unfreeze(target);
+        if (frozen.contains(target.getUniqueId())) {
+            unfreeze(target);
+        } else {
+            freeze(target, staff);
+        }
     }
 
     private void freeze(Player target, Player staff) {
         UUID targetUUID = target.getUniqueId();
+
         if (frozen.add(targetUUID)) {
             frozenBy.put(targetUUID, staff.getUniqueId());
+
+            // Clear any existing helmet
+            target.getInventory().setHelmet(null);
             target.getInventory().setHelmet(new ItemStack(Material.BLUE_ICE));
-            target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, Integer.MAX_VALUE, 255, false, false, false));
+
+            // Use reasonable potion amplifier
+            target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, Integer.MAX_VALUE, 10, false, false, false));
             target.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 1, false, false, false));
+
             target.sendMessage(Component.text("You have been frozen by staff.", NamedTextColor.RED));
             staff.sendMessage(Component.text("You have frozen " + target.getName(), NamedTextColor.GREEN));
+
+            Bukkit.getLogger().info("[StaffMode] " + staff.getName() + " froze " + target.getName());
         }
     }
 
     private void unfreeze(Player target) {
         UUID targetUUID = target.getUniqueId();
+
         if (frozen.remove(targetUUID)) {
-            frozenBy.remove(targetUUID);
+            UUID staffUUID = frozenBy.remove(targetUUID);
+
             target.getInventory().setHelmet(null);
             target.removePotionEffect(PotionEffectType.SLOWNESS);
             target.removePotionEffect(PotionEffectType.BLINDNESS);
             target.sendMessage(Component.text("You have been unfrozen.", NamedTextColor.GREEN));
+
+            if (staffUUID != null) {
+                Player staff = Bukkit.getPlayer(staffUUID);
+                if (staff != null) {
+                    staff.sendMessage(Component.text("You have unfrozen " + target.getName(), NamedTextColor.GREEN));
+                }
+            }
+
+            Bukkit.getLogger().info("[StaffMode] " + target.getName() + " was unfrozen.");
         }
     }
 
@@ -111,17 +142,14 @@ public class FreezeListener implements Listener {
 
         if (frozen.contains(playerUUID)) {
             e.setCancelled(true);
-            Player staff = Bukkit.getPlayer(frozenBy.get(playerUUID));
+            UUID staffUUID = frozenBy.get(playerUUID);
+            Player staff = staffUUID != null ? Bukkit.getPlayer(staffUUID) : null;
+
             if (staff != null) {
-                staff.sendMessage(Component.text(player.getName() + ": " + e.getMessage(), NamedTextColor.BLUE));
+                staff.sendMessage(Component.text(player.getName() + ": " + e.getMessage(), NamedTextColor.GRAY));
             }
-        } else if (plugin.getStaffModePlayers().contains(playerUUID)) {
-            for (Player p : Bukkit.getOnlinePlayers()) {
-                if (plugin.getStaffModePlayers().contains(p.getUniqueId()) || frozenBy.containsValue(p.getUniqueId())) {
-                    p.sendMessage(Component.text(player.getName() + ": " + e.getMessage(), NamedTextColor.RED));
-                }
-            }
-            e.setCancelled(true);
+
+            player.sendMessage(Component.text("You: " + e.getMessage(), NamedTextColor.DARK_GRAY));
         }
     }
 }

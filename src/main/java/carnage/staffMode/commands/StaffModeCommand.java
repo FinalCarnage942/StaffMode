@@ -1,18 +1,21 @@
 package carnage.staffMode.commands;
 
 import carnage.staffMode.StaffMode;
-import me.neznamy.tab.api.TabAPI;
-import me.neznamy.tab.api.TabPlayer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.bukkit.*;
-import org.bukkit.command.*;
+import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
+import org.bukkit.Material;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.*;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.UUID;
 
 public class StaffModeCommand implements CommandExecutor {
 
@@ -24,89 +27,100 @@ public class StaffModeCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player player)) {
-            sender.sendMessage(Component.text("Only players can use this command.", NamedTextColor.RED));
-            return true;
-        }
+        if (!(sender instanceof Player player)) return true;
 
         UUID uuid = player.getUniqueId();
+
         if (!player.hasPermission("staffmode.use")) {
-            player.sendMessage(Component.text("No permission.", NamedTextColor.RED));
+            player.sendMessage("You do not have permission to use this command.");
             return true;
         }
 
-        Set<UUID> staff = plugin.getStaffModePlayers();
-        Set<UUID> vanished = plugin.getVanishedPlayers();
-        Map<UUID, ItemStack[]> invs = plugin.getSavedInventories();
-        Map<UUID, ItemStack[]> armors = plugin.getSavedArmor();
-        Map<UUID, GameMode> gms = plugin.getSavedGameModes();
-
-        if (staff.contains(uuid)) {
-            // Disable staff
-            staff.remove(uuid);
-            vanished.remove(uuid);
-
-            player.sendMessage(Component.text("Staff mode disabled.", NamedTextColor.RED));
-            if (invs.containsKey(uuid)) player.getInventory().setContents(invs.remove(uuid));
-            if (armors.containsKey(uuid)) player.getInventory().setArmorContents(armors.remove(uuid));
-            GameMode last = gms.remove(uuid);
-            player.setGameMode(last != null ? last : GameMode.SURVIVAL);
-
-            Bukkit.getOnlinePlayers().forEach(o -> o.showPlayer(plugin, player));
-            TabPlayer tp = TabAPI.getInstance().getPlayer(uuid);
-            if (tp != null) tp.setTemporaryGroup(null);
-
+        if (!plugin.getStaffModePlayers().contains(uuid)) {
+            enableStaffMode(player);
         } else {
-            // Enable staff
-            staff.add(uuid);
-
-            invs.put(uuid, player.getInventory().getContents());
-            armors.put(uuid, player.getInventory().getArmorContents());
-            gms.put(uuid, player.getGameMode());
-
-            player.getInventory().clear();
-            player.getInventory().setArmorContents(null);
-            player.setGameMode(GameMode.CREATIVE);
-            player.sendMessage(Component.text("Staff mode enabled.", NamedTextColor.GREEN));
-
-            // Vanish tool
-            ItemStack vanish = makeTool(Material.ENDER_EYE, "Vanish Tool",
-                    "Right click to vanish", "Left click to unvanish");
-
-            // Freeze tool (iron shovel)
-            ItemStack freeze = makeTool(Material.IRON_SHOVEL, "Freeze Tool",
-                    "Right click a player to freeze", "Right click again to unfreeze");
-
-            // Random teleport tool
-            ItemStack randomTeleport = makeTool(Material.NETHER_STAR, "Random Teleport",
-                    "Right click to teleport", "to a random player");
-
-            player.getInventory().setItem(0, vanish);
-            player.getInventory().setItem(1, freeze);
-            player.getInventory().setItem(2, randomTeleport);
-
-            // Vanish on start
-            vanished.add(uuid);
-            Bukkit.getOnlinePlayers().stream()
-                    .filter(o -> !o.hasPermission("staffmode.use"))
-                    .forEach(o -> o.hidePlayer(plugin, player));
-
-            TabPlayer tp = TabAPI.getInstance().getPlayer(uuid);
-            if (tp != null) tp.setTemporaryGroup("invisible");
+            disableStaffMode(player);
         }
 
         return true;
     }
 
-    private ItemStack makeTool(Material mat, String name, String lore1, String lore2) {
-        ItemStack item = new ItemStack(mat);
-        ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text(name, NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(
-                Component.text(lore1, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text(lore2, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)
-        ));
-        item.setItemMeta(meta);
-        return item;
+    public void setupStaffInventory(Player player) {
+        if (player.hasPermission("staffmode.vanish")) {
+            ItemStack vanishTool = new ItemStack(Material.ENDER_EYE);
+            ItemMeta vanishMeta = vanishTool.getItemMeta();
+            vanishMeta.displayName(Component.text("Toggle Vanish", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+            vanishTool.setItemMeta(vanishMeta);
+            player.getInventory().setItem(1, vanishTool);
+        }
+
+        if (player.hasPermission("staffmode.freeze")) {
+            ItemStack freezeTool = new ItemStack(Material.IRON_SHOVEL);
+            ItemMeta freezeMeta = freezeTool.getItemMeta();
+            freezeMeta.displayName(Component.text("Freeze Player", NamedTextColor.RED).decoration(TextDecoration.ITALIC, false));
+            freezeTool.setItemMeta(freezeMeta);
+            player.getInventory().setItem(3, freezeTool);
+        }
+
+        if (player.hasPermission("staffmode.randomteleport")) {
+            ItemStack randomTeleportTool = new ItemStack(Material.NETHER_STAR);
+            ItemMeta teleportMeta = randomTeleportTool.getItemMeta();
+            teleportMeta.displayName(Component.text("Random Teleport").decoration(TextDecoration.ITALIC, false));
+            teleportMeta.lore(Arrays.asList(
+                    Component.text("Right click to teleport", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("to a random player", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)
+            ));
+            randomTeleportTool.setItemMeta(teleportMeta);
+            player.getInventory().setItem(5, randomTeleportTool);
+        }
+    }
+
+    private void enableStaffMode(Player player) {
+        UUID uuid = player.getUniqueId();
+        plugin.getSavedInventories().put(uuid, player.getInventory().getContents());
+        plugin.getSavedArmor().put(uuid, player.getInventory().getArmorContents());
+        plugin.getSavedGameModes().put(uuid, player.getGameMode());
+
+        player.getInventory().clear();
+        player.setGameMode(GameMode.CREATIVE);
+
+        setupStaffInventory(player);
+
+        plugin.getStaffModePlayers().add(uuid);
+
+        if (player.hasPermission("staffmode.vanish")) {
+            plugin.getVanishedPlayers().add(uuid);
+            player.setInvisible(true);
+            for (Player otherPlayer : Bukkit.getOnlinePlayers()) {
+                if (!otherPlayer.hasPermission("staffmode.use")) {
+                    otherPlayer.hidePlayer(plugin, player);
+                }
+            }
+        }
+
+        player.sendMessage(Component.text("Staff Mode enabled.", NamedTextColor.GREEN));
+    }
+
+    private void disableStaffMode(Player player) {
+        UUID uuid = player.getUniqueId();
+        player.getInventory().clear();
+        if (plugin.getSavedInventories().containsKey(uuid)) {
+            player.getInventory().setContents(plugin.getSavedInventories().remove(uuid));
+        }
+        if (plugin.getSavedArmor().containsKey(uuid)) {
+            player.getInventory().setArmorContents(plugin.getSavedArmor().remove(uuid));
+        }
+        if (plugin.getSavedGameModes().containsKey(uuid)) {
+            player.setGameMode(plugin.getSavedGameModes().remove(uuid));
+        }
+
+        plugin.getStaffModePlayers().remove(uuid);
+        plugin.getVanishedPlayers().remove(uuid);
+        player.setInvisible(false);
+        for (Player otherPlayer : Bukkit.getOnlinePlayers()) {
+            otherPlayer.showPlayer(plugin, player);
+        }
+
+        player.sendMessage(Component.text("Staff Mode disabled.", NamedTextColor.RED));
     }
 }

@@ -4,10 +4,29 @@ main: carnage.staffMode.StaffMode
 api-version: '1.21'
 depend: [TAB]
 softdepend: [DeluxeCombat]
-
 permissions:
   staffmode.use:
     description: Allows the player to toggle staff mode.
+    default: op
+  staffmode.admin:
+    description: Grants all staff mode permissions.
+    default: op
+    children:
+      staffmode.use: true
+      staffmode.vanish: true
+      staffmode.freeze: true
+      staffmode.randomteleport: true
+  staffmode.vanish:
+    description: Allows the player to use vanish in staff mode.
+    default: op
+  staffmode.freeze:
+    description: Allows the player to use freeze in staff mode.
+    default: op
+  staffmode.randomteleport:
+    description: Allows the player to use random teleport in staff mode.
+    default: op
+  staffmode.novanish:
+    description: Puts the player in staff mode without vanish.
     default: op
 
 commands:
@@ -15,3 +34,7 @@ commands:
     aliases: [sm]
     description: Toggles staff mode
     usage: /staffmode
+  staffchat:
+    aliases: [sc]
+    description: Toggles staff chat mode
+    usage: /staffchat
